@@ -1,7 +1,7 @@
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
-from rest_framework import generics, permissions, status, mixins
+from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.renderers import JSONRenderer
 from rest_framework.parsers import JSONParser
