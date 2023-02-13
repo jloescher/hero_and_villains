@@ -1,8 +1,19 @@
 from django.shortcuts import render, get_object_or_404
-from rest_framework import generics, permissions, status
+from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+from rest_framework import generics, permissions, status, mixins
 from rest_framework.response import Response
+from rest_framework.renderers import JSONRenderer
+from rest_framework.parsers import JSONParser
 from .models import Super
 from .serializers import SuperSerializer
+
+
+class JSONResponse(HttpResponse):
+    def __init__(self, data, **kwargs):
+        content = JSONRenderer().render(data)
+        kwargs["content_type"] = "application/json"
+        super(JSONResponse, self).__init__(content, **kwargs)
 
 
 # Create your views here.
@@ -32,41 +43,26 @@ class SuperView(generics.ListAPIView, generics.CreateAPIView):
             return Response(custom_response)
 
 
-class SuperDetailView(generics.RetrieveAPIView):
-    queryset = Super.objects.all()
-    serializer_class = SuperSerializer
+@csrf_exempt
+def super_detail(request, pk):
+    try:
+        super = Super.objects.get(pk=pk)
+    except Super.DoesNotExist:
+        return HttpResponse(status=status.HTTP_404_NOT_FOUND)
 
-
-class SuperUpdateView(generics.RetrieveUpdateAPIView):
-    queryset = Super.objects.all()
-    serializer_class = SuperSerializer
-    permission_classes = [
-        permissions.AllowAny,
-    ]
-
-    def perform_update(self, serializer):
-        serializer.save()
-
-    def update(self, request, *args, **kwargs):
-        serializer = self.perform_update(self.get_serializer())
-        return Response(serializer.data)
-
-
-class SuperDeleteView(generics.DestroyAPIView):
-    queryset = Super.objects.all()
-    serializer_class = SuperSerializer
-    http_method_names = ["DELETE"]
-    permission_classes = [
-        permissions.AllowAny,
-    ]
-    allowed_methods = [
-        "DELETE",
-    ]
-
-    def delete(self, request, *args, **kwargs):
-        if request.method != "DELETE":
-            print(request.method)
-            return Response(status=status.HTTP_405_METHOD_NOT_ALLOWED)
-        super = self.get_object()
-        super.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+    match request.method:
+        case "GET":
+            super_serializer = SuperSerializer(super)
+            return JSONResponse(super_serializer.data)
+        case "PUT":
+            super_data = JSONParser().parse(request)
+            super_serializer = SuperSerializer(super, data=super_data)
+            if super_serializer.is_valid():
+                super_serializer.save()
+                return JSONResponse(super_serializer.data)
+            return JSONResponse(
+                super_serializer.errors, status=status.HTTP_400_BAD_REQUEST
+            )
+        case "DELETE":
+            super.delete()
+            return HttpResponse(status=status.HTTP_204_NO_CONTENT)
